@@ -6,6 +6,8 @@ def test_score
     [ "abcde", "abcde", "CCCCC" ],
     [ "abcde", "xxxxx", "WWWWW" ],
     [ "abcde", "edcba", "MMCMM" ],
+    [ "aabbb", "bbbaa", "MMCMM" ],
+    [ "aaxyz", "axayz", "CMMCC" ],
   ].each do |solution, guess, expected_score|
     expected_score.chars.map do |c|
       case c
