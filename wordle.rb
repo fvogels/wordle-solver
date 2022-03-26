@@ -1,3 +1,5 @@
+$dictionary = IO.readlines('words.txt').map(&:strip)
+
 def score(solution:, guess:)
   solution = solution.chars
   guess = guess.chars
@@ -26,5 +28,11 @@ def score(solution:, guess:)
 
   result
 end
+
+
+def score?(expected_score:, solution:, guess:)
+  score(solution: solution, guess: guess) == expected_score
+end
+
 
 main if $0 == __FILE__
