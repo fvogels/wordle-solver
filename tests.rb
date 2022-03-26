@@ -1,4 +1,4 @@
-require_relative 'wordle'
+require_relative 'score'
 
 
 def test_score

@@ -31,7 +31,7 @@ def write_binary(table, filename)
   abort "Cannot write binary to STDOUT" if filename == :stdout
 
   binary = Marshal.dump(table)
-  IO.write(filename, binary)
+  IO.binwrite(filename, binary)
 end
 
 def write_text(table, filename)
