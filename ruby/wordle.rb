@@ -1,7 +1,7 @@
 # SCORES_FILENAME = 'scores.txt'
-# SCORES_FILENAME = 'scores.bin'
+SCORES_FILENAME = 'scores.bin'
 # SCORES_FILENAME = 'scores-light.bin'
-SCORES_FILENAME = 'testwords.bin'
+# SCORES_FILENAME = 'testwords.bin'
 # SCORES_FILENAME = 'scores-light.txt'
 
 def unparse_score(n)
@@ -48,45 +48,20 @@ def score(solution:, guess:)
 end
 
 
-def information_gained(guess_score:, guess:, candidate_solutions:)
-  compatible_count = candidate_solutions.count do |candidate_solution|
-    score(solution: candidate_solution, guess: guess) == guess_score
-  end
-
-  incompatible_count = candidate_solutions.size - compatible_count
-
-  original_information_necessary = Math.log2(candidate_solutions.size)
-  average_information_after_guess =
-    (
-      (compatible_count > 0 ? compatible_count * Math.log2(compatible_count) : 0) +
-      (incompatible_count > 0 ? incompatible_count * Math.log2(incompatible_count) : 0)
-    ) / candidate_solutions.size
-
-  result = original_information_necessary - average_information_after_guess
-
-  # STDERR.puts "Guess=#{guess} Score=#{unparse_score(guess_score)} Original=#{original_information_necessary} After=#{average_information_after_guess} #{candidate_solutions.size}=#{compatible_count}+#{incompatible_count}"
-
-  result
-end
-
-
 def average_information_gained(guess:, candidate_solutions:)
-  candidate_solutions.map do |candidate_solution|
+  candidate_solutions.group_by do |candidate_solution|
     s = score(solution: candidate_solution, guess: guess)
-    information_gained(guess_score: s, guess: guess, candidate_solutions: candidate_solutions)
-  end.sum / candidate_solutions.size
+  end.map do |key, words|
+    words.size * Math.log2(words.size)
+  end.sum.then do |information|
+    Math.log2(candidate_solutions.size) - information / candidate_solutions.size
+  end
 end
 
 
 def find_best_guess(candidate_solutions:, candidate_guesses:)
-  count = 0
-  candidate_guesses.max_by do |candidate_guess|
-    count += 1
-    if count % 10 == 0
-      STDERR.puts "#{count * 100 / candidate_guesses.size}%"
-    end
-
-    average_information_gained(guess: candidate_guess, candidate_solutions: candidate_solutions)
+  candidate_guesses.max_by do |guess|
+    average_information_gained(guess: guess, candidate_solutions: candidate_solutions)
   end
 end
 
