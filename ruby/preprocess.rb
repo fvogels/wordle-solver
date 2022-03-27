@@ -34,6 +34,33 @@ def write_binary(table, filename)
   IO.binwrite(filename, binary)
 end
 
+def write_compressed(table, filename)
+  abort "Cannot write binary to STDOUT" if filename == :stdout
+
+  words = table.keys.map { |key| key[0...5] }.uniq.sort
+
+  File.open(filename, 'wb') do |file|
+    file.write([words.size].pack('L'))
+
+    words.map do |word|
+      id = word.chars.reduce(0) do |acc, letter|
+        acc * 26 + (letter.ord - 'a'.ord)
+      end
+    end.then do |data|
+      file.write(data.pack('L*'))
+    end
+
+    words.flat_map do |solution|
+      words.map do |guess|
+        key = "#{solution}:#{guess}"
+        score = table[key]
+      end
+    end.then do |data|
+      file.write(data.pack('C*'))
+    end
+  end
+end
+
 def write_text(table, filename)
   file = filename == :stdout ? STDOUT : File.open(filename, 'w')
 
@@ -50,6 +77,8 @@ def write(table, filename, mode)
     write_text(table, filename)
   when :binary
     write_binary(table, filename)
+  when :compressed
+    write_compressed(table, filename)
   end
 end
 
@@ -58,6 +87,10 @@ options = { mode: :text, output: :stdout }
 OptionParser.new do |opts|
   opts.on('-b', '--binary', 'Output in binary') do
     options[:mode] = :binary
+  end
+
+  opts.on('-c', '--compressed', 'Compressed output') do
+    options[:mode] = :compressed
   end
 
   opts.on('-o [FILE]', 'Output file') do |filename|
