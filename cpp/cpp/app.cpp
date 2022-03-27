@@ -72,6 +72,33 @@ std::string to_score(scoreid id)
     return std::string(buffer);
 }
 
+scoreid from_score(const std::string& string)
+{
+    scoreid id = 0;
+
+    for (int i = 0; i != string.size(); ++i)
+    {
+        int k = 0;
+
+        switch (string[i])
+        {
+        case 'W':
+            k = 0;
+            break;
+        case 'M':
+            k = 1;
+            break;
+        case 'C':
+            k = 2;
+            break;
+        }
+
+        id = id * 3 + k;
+    }
+
+    return id;
+}
+
 class Scorer
 {
 private:
@@ -155,76 +182,36 @@ std::vector<wordid> filter_words(const Scorer& scorer, const T& words, wordid gu
 }
 
 template<typename T>
-double measure_information_gained(const Scorer& scorer, scoreid score, wordid guess, const T& candidate_solutions)
-{
-    unsigned compatible_count = 0;
-    unsigned incompatible_count = 0;
-    auto it = candidate_solutions.begin();
-    auto end = candidate_solutions.end();
-
-    while (it != end)
-    {
-        wordid candidate = *it;
-
-        if (scorer.lookup(candidate, guess) == score)
-        {
-            ++compatible_count;
-        }
-        else
-        {
-            ++incompatible_count;
-        }
-
-        it++;
-    }
-
-    auto total = compatible_count + incompatible_count;
-    double information = total * log2(total);
-
-    if (compatible_count > 0)
-    {
-        information -= compatible_count * log2(compatible_count);
-    }
-
-    if (incompatible_count > 0)
-    {
-        information -= incompatible_count * log2(incompatible_count);
-    }
-
-    information /= total;
-
-    // std::cout << to_word(guess) << " " << compatible_count << " " << incompatible_count << ": " << information << " bits" << std::endl;
-
-    return information;
-}
-
-template<typename T>
 double average_information_gained(const Scorer& scorer, wordid guess, const T& candidate_solutions)
 {
-    double table[243];
+    const unsigned N = 243;
+    unsigned table[N];
     double total_information = 0;
     unsigned count = 0;
 
-    std::fill_n(table, 243, -1);
+    std::fill_n(table, 243, 0);
 
     for (auto& candidate_solution : candidate_solutions)
     {
         auto score = scorer.lookup(candidate_solution, guess);
 
-        if (table[score] == -1)
-        {
-            table[score] = measure_information_gained(scorer, score, guess, candidate_solutions);
-        }
-        
-        total_information += table[score];
+        table[score]++;
         count++;
     }
 
-    double average = total_information / count;
+    double information = 0;
 
-    // std::cout << "Average for " << to_word(guess) << ": " << average << std::endl;
-    
-    return average;
+    for (unsigned i = 0; i != N; ++i)
+    {
+        if (table[i] > 0)
+        {
+            information += table[i] * log2(table[i]);
+        }
+    }
+
+    information = log2(count) - information / count;
+
+    return information;
 }
 
 
@@ -238,7 +225,7 @@ wordid find_best_guess(const Scorer& scorer, const T& candidate_solutions, const
 
     for (auto& guess : candidate_guesses)
     {
-        auto information = average_information_gained(scorer, guess, candidate_guesses);
+        auto information = average_information_gained(scorer, guess, candidate_solutions);
 
         if (information > most_information_gained)
         {
@@ -292,10 +279,10 @@ wordid find_best_guess(const Scorer& scorer, const T& candidate_solutions, const
         auto batch = &batches[i];
         *mig = 0;
 
-        std::thread thread([mig, bg, batch, &scorer, &candidate_guesses, &progress]() {
+        std::thread thread([mig, bg, batch, &scorer, &candidate_solutions, &progress]() {
             for (auto guess : *batch)
             {
-                auto information = average_information_gained(scorer, guess, candidate_guesses);
+                auto information = average_information_gained(scorer, guess, candidate_solutions);
 
                 if (information > *mig)
                 {
@@ -347,33 +334,63 @@ wordid find_best_guess(const Scorer& scorer, const T& candidate_solutions, const
     return bg;
 }
 
+class Selector
+{
+private:
+    const Scorer& scorer;
+    std::vector<wordid> words;
+
+public:
+    Selector(const Scorer& scorer, const std::vector<wordid>& words)
+        : scorer(scorer), words(words) { }
+
+    Selector& filter(const std::string& word, const std::string& score)
+    {
+        words = filter_words(scorer, words, from_word(word), from_score(score));
+        return *this;
+    }
+
+    const std::vector<wordid>& result() const { return this->words; }
+};
+
 int main()
 {
-    // jazzy
     auto scorer = load_scorer(R"(G:\repos\wordle\scores.compressed)");
-    auto& words = scorer.wordids();
+    auto words = std::vector<wordid>(scorer.wordids().begin(), scorer.wordids().end());
 
     //{
-    //    auto word = from_word("jazzy");
+    //    auto word = from_word("tears");
     //    auto information = average_information_gained(scorer, word, words);
     //    std::cout << to_word(word) << std::endl;
     //    std::cout << information << std::endl;
     //}
 
     //{
-    //    auto word = from_word("steak");
+    //    auto word = from_word("tares");
+    //    auto information = average_information_gained(scorer, word, words);
+    //    std::cout << to_word(word) << std::endl;
+    //    std::cout << information << std::endl;
+    //}
+
+    //{
+    //    auto word = from_word("notes");
     //    auto information = average_information_gained(scorer, word, words);
     //    std::cout << to_word(word) << std::endl;
     //    std::cout << information << std::endl;
     //}
 
 
-    //auto best_guess = find_best_guess(scorer, words, words);
-    //std::cout << to_word(best_guess) << std::endl;
-
-
-    auto sel = filter_words(scorer, words, from_word("jazzy"), 0);
+    auto sel = Selector(scorer, words)
+        .filter("tares", "MWWWW")
+        .filter("could", "WWWWW")
+        .filter("bilge", "WCWWW")
+        .filter("bully", "WWWWC")
+        .filter("bylaw", "WMWWM")
+        .filter("abide", "WWMWW")
+        .filter("amiss", "WWMWW")
+        .result();
     std::cout << sel.size() << std::endl;
+    for (auto s : sel) { std::cout << to_word(s) << std::endl; }
     auto best_guess = find_best_guess(scorer, sel, words, 6);
     std::cout << to_word(best_guess) << std::endl;
 }
