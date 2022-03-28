@@ -18,6 +18,14 @@ class Judge
       average_information_gained(guess: guess, candidate_solutions: candidate_solutions)
     end
   end
+
+  def to_s
+    '<JUDGE>'
+  end
+
+  def inspect
+    to_s
+  end
 end
 
 
@@ -69,7 +77,7 @@ end
 
 
 def judgement_id(judgement)
-  judgement.map do |x|
+  judgement.chars.map do |x|
     case x
     when :correct
       2
@@ -98,6 +106,22 @@ def unparse_judgement(id)
 end
 
 
+def parse_judgement(judgement)
+  judgement.upcase.chars.reduce(0) do |acc, c|
+    k = case c
+    when 'W'
+      0
+    when 'M'
+      1
+    when 'C'
+      2
+    end
+
+    acc * 3 + k
+  end
+end
+
+
 def parse_command_line_arguments
   options = { judge: StandardJudge.new }
 
@@ -114,6 +138,45 @@ def parse_command_line_arguments
   end.parse!
 
   options
+end
+
+
+class Solver
+  def initialize(judge, words)
+    @judge = judge
+    @candidates = words
+    @dictionary = words
+  end
+
+  def self.load_cache(filename)
+    judge = CachedJudge.new filename
+    words = judge.words
+    Solver.new(judge, words)
+  end
+
+  def best_guess
+    @judge.find_best_guess(candidate_solutions: @candidates, candidate_guesses: @dictionary)
+  end
+
+  def update(guess, judgement)
+    id = parse_judgement(judgement)
+
+    @candidates = @candidates.select do |candidate|
+      @judge.judge(solution: candidate, guess: guess) == id
+    end
+  end
+
+  def reset
+    @candidates = @dictionary
+  end
+
+  def to_s
+    "<SOLVER>"
+  end
+
+  def inspect
+    to_s
+  end
 end
 
 
